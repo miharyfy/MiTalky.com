@@ -4,11 +4,13 @@ const http = require("http");
 const socketIo = require("socket.io");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// Sessions
 app.use(cookieParser());
 app.use(session({
   secret: "mihchat-secret-key",
@@ -16,16 +18,20 @@ app.use(session({
   saveUninitialized: true
 }));
 
+// Body parser
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "public")));
 
+// Static files (style.css, script.js)
+app.use(express.static(__dirname));
+
+// Routes
 app.get("/", (req, res) => {
   if (req.session.username) {
-    let chatHtml = require("fs").readFileSync(path.join(__dirname, "public/chat.html"), "utf-8");
+    let chatHtml = fs.readFileSync(path.join(__dirname, "chat.html"), "utf-8");
     chatHtml = chatHtml.replace("{{USERNAME}}", req.session.username);
     return res.send(chatHtml);
   }
-  res.sendFile(path.join(__dirname, "public/login.html"));
+  res.sendFile(path.join(__dirname, "login.html"));
 });
 
 app.post("/login", (req, res) => {
@@ -37,6 +43,7 @@ app.post("/login", (req, res) => {
   res.redirect("/");
 });
 
+// Session amin'ny socket
 io.use((socket, next) => {
   const req = socket.request;
   const res = req.res;
@@ -49,6 +56,7 @@ io.use((socket, next) => {
   });
 });
 
+// Socket IO
 io.on("connection", (socket) => {
   const username = socket.request.session.username;
   if (!username) return socket.disconnect(true);
