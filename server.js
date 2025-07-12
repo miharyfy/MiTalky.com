@@ -1,16 +1,16 @@
 const express = require("express");
 const path = require("path");
 const http = require("http");
+const fs = require("fs");
 const socketIo = require("socket.io");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
-const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Sessions
+// --- Middleware ---
 app.use(cookieParser());
 app.use(session({
   secret: "mihchat-secret-key",
@@ -18,22 +18,23 @@ app.use(session({
   saveUninitialized: true
 }));
 
-// Body parser
 app.use(express.urlencoded({ extended: true }));
 
-// Static files (style.css, script.js)
-app.use(express.static(__dirname));
+// 🔧 Ampiasaina mba hahitana style.css sy script.js
+app.use(express.static(__dirname));  // io no tena ilaina raha tsy mampiasa /public
 
-// Routes
+// 🔐 ROUTE: GET /
 app.get("/", (req, res) => {
   if (req.session.username) {
     let chatHtml = fs.readFileSync(path.join(__dirname, "chat.html"), "utf-8");
     chatHtml = chatHtml.replace("{{USERNAME}}", req.session.username);
     return res.send(chatHtml);
+  } else {
+    return res.sendFile(path.join(__dirname, "login.html"));
   }
-  res.sendFile(path.join(__dirname, "login.html"));
 });
 
+// 🔐 ROUTE: POST /login
 app.post("/login", (req, res) => {
   const { username } = req.body;
   if (username && username.trim() !== "") {
@@ -43,7 +44,7 @@ app.post("/login", (req, res) => {
   res.redirect("/");
 });
 
-// Session amin'ny socket
+// 🔌 SOCKET SESSION
 io.use((socket, next) => {
   const req = socket.request;
   const res = req.res;
@@ -56,15 +57,16 @@ io.use((socket, next) => {
   });
 });
 
-// Socket IO
+// 🔁 SOCKET CHAT
 io.on("connection", (socket) => {
   const username = socket.request.session.username;
   if (!username) return socket.disconnect(true);
 
-  socket.on("chat message", ({ user, text }) => {
+  socket.on("chat message", ({ text }) => {
     io.emit("chat message", { user: username, text });
   });
 });
 
+// ✅ START SERVER
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`MihChat server listening on ${PORT}`));
+server.listen(PORT, () => console.log("🚀 MihChat mandeha @ http://localhost:" + PORT));
